@@ -1,0 +1,5 @@
+{
+  "mainFile": "template.tex",
+  "engine": "pdflatex",
+  "autoCompile": true
+}

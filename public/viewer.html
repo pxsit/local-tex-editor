@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF — LaTeX</title>
+<link rel="stylesheet" href="/style.css">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('theme')==='light'?'light':'dark'}catch(e){}</script>
+</head>
+<body class="viewer">
+<div id="v-toolbar">
+  <button id="pg-prev" class="mini" title="Previous page">▲</button>
+  <button id="pg-next" class="mini" title="Next page">▼</button>
+  <input id="pg-input" value="1" size="3" title="Page"><span id="pg-total" class="muted">/ 0</span>
+  <span class="spacer"></span>
+  <button id="zoom-out" class="mini" title="Zoom out">−</button>
+  <select id="zoom-select"></select>
+  <button id="zoom-in" class="mini" title="Zoom in">+</button>
+  <span class="spacer"></span>
+  <button id="btn-download" class="btn-sm">Download</button>
+  <button id="btn-print" class="btn-sm">Print</button>
+  <button id="btn-theme" class="icon-btn" title="Toggle theme">◐</button>
+</div>
+<div id="v-body">
+  <div id="pdf-scroll"></div>
+  <div id="placeholder" class="pdf-placeholder-v">No PDF yet. Compile in the editor window.</div>
+</div>
+<script type="module" src="/viewer.js"></script>
+</body>
+</html>

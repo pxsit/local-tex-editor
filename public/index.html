@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LaTeX Editor</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23138a36'/%3E%3Ctext x='16' y='23' font-size='20' font-family='serif' font-weight='bold' fill='white' text-anchor='middle'%3ETe%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('theme')==='light'?'light':'dark'}catch(e){}</script>
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="brand"><span id="proj-label">LaTeX Project</span> <span id="main-label" class="muted"></span></div>
+    <div class="spacer"></div>
+    <span id="save-status" class="ok">All changes saved</span>
+    <select id="engine-select" title="TeX engine">
+      <option value="xelatex">XeLaTeX</option>
+      <option value="pdflatex">pdfLaTeX</option>
+      <option value="lualatex">LuaLaTeX</option>
+    </select>
+    <label class="switch" title="Compile automatically after saving"><input type="checkbox" id="auto-compile"><span class="slider"></span><span class="switch-label">Auto-compile</span></label>
+    <button id="btn-recompile" class="primary" title="Recompile (Ctrl+Enter)"><span class="spinner"></span><span id="recompile-label">Recompile</span></button>
+    <button id="btn-popout" class="icon-btn" title="Open PDF in new window"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg></button>
+    <button id="btn-download" class="icon-btn" title="Download PDF"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></button>
+    <button id="btn-theme" class="icon-btn" title="Toggle theme"></button>
+  </header>
+
+  <nav id="rail"></nav>
+
+  <aside id="sidebar">
+    <div id="view-files">
+      <section id="sec-tree" class="acc">
+        <div class="acc-head"><span class="acc-caret"></span><span class="acc-title">File tree</span>
+          <span class="acc-actions">
+            <button id="btn-new-file" class="mini" title="New file"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M12 11v6M9 14h6"/></svg></button>
+            <button id="btn-new-folder" class="mini" title="New folder"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v6M9 14h6"/></svg></button>
+            <button id="btn-upload" class="mini" title="Upload files"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg></button>
+          <button id="btn-close-sidebar" class="mini" title="Close sidebar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+          </span>
+        </div>
+        <div class="acc-body"><div id="tree"></div></div>
+      </section>
+      <section id="sec-outline" class="acc">
+        <div class="acc-head"><span class="acc-caret"></span><span class="acc-title">File outline</span></div>
+        <div class="acc-body"><div id="outline"></div></div>
+      </section>
+    </div>
+    <div id="view-search" style="display:none">
+      <div class="search-box">
+        <div class="sq-row"><input id="search-q" placeholder="Search in project" spellcheck="false">
+          <button id="sq-case" class="tog" title="Match case">Aa</button><button id="sq-word" class="tog" title="Whole word">ab</button><button id="sq-regex" class="tog" title="Regular expression">.*</button></div>
+        <div class="sq-row"><input id="search-r" placeholder="Replace with" spellcheck="false"><button id="search-replace-all" class="btn-sm">Replace all</button></div>
+        <div id="search-summary" class="muted small"></div>
+      </div>
+      <div id="search-results"></div>
+    </div>
+    <input type="file" id="upload-input" multiple hidden>
+  </aside>
+  <div id="rz1" class="resizer"></div>
+
+  <main id="editorcol">
+    <div id="tabbar"></div>
+    <div id="toolbar"></div>
+    <div id="editor-host"></div>
+    <div id="preview" style="display:none"></div>
+  </main>
+  <div id="rz2" class="resizer"><button id="btn-forward" title="Go to PDF position of the cursor (Ctrl+Alt+→)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>
+
+  <section id="pdfcol">
+    <div id="pdf-toolbar">
+      <input id="pg-input" value="1" size="3" title="Page"><span id="pg-total" class="muted">/ 0</span>
+      <span class="spacer"></span>
+      <button id="zoom-out" class="mini" title="Zoom out"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/></svg></button>
+      <select id="zoom-select"></select>
+      <button id="zoom-in" class="mini" title="Zoom in"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button id="btn-logs" class="logs-btn" title="Show compile logs">Logs <span id="badge-err" class="badge err" style="display:none">0</span><span id="badge-warn" class="badge warn" style="display:none">0</span></button>
+    </div>
+    <div id="pdf-body">
+      <div id="pdf-scroll"></div>
+      <div id="pdf-placeholder">Click Recompile (Ctrl+Enter) to see a preview</div>
+      <div id="logpanel">
+        <div class="log-head"><strong>Logs</strong><span class="spacer"></span><button id="log-raw-btn" class="btn-sm">Raw logs</button><button id="log-close" class="mini" title="Close">✕</button></div>
+        <div id="log-body"></div>
+        <pre id="log-raw" style="display:none"></pre>
+      </div>
+    </div>
+  </section>
+  <div id="drag-overlay"></div>
+</div>
+<div id="toast"></div>
+<script type="module" src="/app.js"></script>
+</body>
+</html>
