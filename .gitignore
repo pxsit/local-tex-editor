@@ -1,38 +1,32 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # dependencies
-/node_modules
-/.pnp
-.pnp.js
+/node_modules/
 
-# testing
-/coverage
+# runtime / local state (created on first run)
+server.log
+*.log
+settings.json
+.build/
 
-# next.js
-/.next/
-/out/
+# the user's LaTeX project and its compile output stay local
+/contents/*
 
-# production
-/build
+# build artifacts that are not needed to run (the bundles in public/ stay committed)
+*.map
 
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# local env files
-.env*.local
+# env / secrets
 .env
+.env.*
 
-# vercel
-.vercel
+# editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# npm debug
+npm-debug.log*
+.npm/
 
-contents/*
+# temp files from atomic saves
+*.tmp-*

@@ -17,3 +17,40 @@
 2026-10-25T00:55:07.190Z LaTeX editor on http://localhost:8170 (contents: C:\Users\Administrator\Documents\latex-editor\contents)
 2026-10-25T00:57:01.878Z LaTeX editor on http://localhost:8170 (contents: C:\Users\Administrator\Documents\latex-editor\contents)
 2026-10-25T01:12:34.854Z LaTeX editor on http://localhost:8170 (contents: C:\Users\Administrator\Documents\latex-editor\contents)
+2026-10-26T11:01:12.670Z LaTeX editor on http://localhost:8170 (contents: C:\Users\Administrator\Documents\Github\local-tex-editor\contents)
+2026-10-26T19:48:16.768Z compile: pdflatex runs=1 bib=false pdf=true 2902ms
+2026-10-26T19:49:33.385Z compile: cancelling running compile (kill pid 8500)
+2026-10-26T19:49:36.048Z compile: cancelling running compile (kill pid 16356)
+2026-10-26T19:49:39.332Z compile: cancelling running compile (kill pid 2068)
+2026-10-26T19:49:47.641Z compile: cancelling running compile (kill pid 16664)
+2026-10-26T19:49:56.763Z compile: pdflatex runs=3 bib=false pdf=true 8327ms
+2026-10-26T19:50:05.520Z compile: pdflatex runs=1 bib=false pdf=true 2796ms
+2026-10-26T19:50:13.659Z compile: pdflatex runs=1 bib=false pdf=true 2800ms
+2026-10-26T19:50:21.595Z compile: cancelling running compile (kill pid 18120)
+2026-10-26T19:50:23.352Z compile: cancelling running compile (kill pid 5548)
+2026-10-26T19:50:25.115Z compile: cancelling running compile (kill pid 26720)
+2026-10-26T19:50:32.186Z compile: cancelling running compile (kill pid 22056)
+2026-10-26T19:50:35.470Z compile: cancelling running compile (kill pid 12936)
+2026-10-26T19:50:37.241Z compile: cancelling running compile (kill pid 24156)
+2026-10-26T19:50:39.025Z compile: cancelling running compile (kill pid 8740)
+2026-10-26T19:50:40.796Z compile: cancelling running compile (kill pid 20388)
+2026-10-26T19:50:42.529Z compile: cancelling running compile (kill pid 12568)
+2026-10-26T19:50:47.118Z compile: cancelling running compile (kill pid 4400)
+2026-10-26T19:50:50.392Z compile: cancelling running compile (kill pid 26908)
+2026-10-26T19:50:58.755Z compile: pdflatex runs=3 bib=false pdf=true 8194ms
+2026-10-26T19:51:10.537Z compile: cancelling running compile (kill pid 27592)
+2026-10-26T19:51:20.642Z compile: pdflatex runs=3 bib=false pdf=true 8336ms
+2026-10-26T19:51:35.827Z compile: pdflatex runs=2 bib=false pdf=true 5548ms
+2026-10-26T19:51:44.581Z compile: pdflatex runs=1 bib=false pdf=true 2816ms
+2026-10-26T21:57:36.074Z LaTeX editor on http://localhost:8170 (contents: C:\Users\Administrator\Documents\Github\local-tex-editor\contents)
+2026-10-27T12:43:11.569Z LaTeX editor on http://localhost:8170 (contents: C:\Users\Administrator\Documents\Github\local-tex-editor\contents)
+2026-10-27T17:49:13.626Z compile: cancelling running compile (kill pid 12544)
+2026-10-27T17:49:14.973Z compile: cancelling running compile (kill pid 20076)
+2026-10-27T17:49:18.219Z compile: cancelling running compile (kill pid 21404)
+2026-10-27T17:49:20.848Z compile: cancelling running compile (kill pid 21108)
+2026-10-27T17:49:24.105Z compile: cancelling running compile (kill pid 21628)
+2026-10-27T17:49:25.840Z compile: cancelling running compile (kill pid 9228)
+2026-10-27T17:49:27.560Z compile: cancelling running compile (kill pid 20448)
+2026-10-27T17:49:36.058Z compile: pdflatex runs=3 bib=false pdf=true 8383ms
+2026-10-27T17:49:45.405Z compile: pdflatex runs=1 bib=false pdf=true 4062ms
+2026-10-27T17:51:31.750Z LaTeX editor on http://localhost:8170 (contents: C:\Users\Administrator\Documents\Github\local-tex-editor\contents)

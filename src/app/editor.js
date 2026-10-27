@@ -13,6 +13,7 @@ import {
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import {
   StreamLanguage,
+  indentUnit,
   indentOnInput,
   bracketMatching,
   foldGutter,
@@ -380,6 +381,7 @@ export function createState(path, text, handlers, dark) {
       closeBrackets(),
       highlightSelectionMatches(),
       EditorState.tabSize.of(4),
+      indentUnit.of('    '),
       EditorState.languageData.of(() => [{ closeBrackets: { brackets: ['(', '[', '{', '$'] } }]),
       StreamLanguage.define(stex),
       autocompletion({ override: [latexCompletions], activateOnTyping: true }),

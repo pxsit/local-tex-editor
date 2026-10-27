@@ -33,5 +33,8 @@
     "globals": "^17.13.0",
     "pdfjs-dist": "^6.4.299",
     "prettier": "^3.9.10"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
   }
 }
