@@ -1,5 +1,5 @@
 {
   "mainFile": "template.tex",
-  "engine": "pdflatex",
+  "engine": "xelatex",
   "autoCompile": true
 }
