@@ -19,6 +19,16 @@ const nextFrame = () =>
     setTimeout(fin, 120); // rAF may be paused in background tabs
   });
 
+// pdf.js 6: PDFDocumentProxy has no destroy(); the loading task owns the worker resources
+function destroyDoc(doc) {
+  try {
+    const t = doc && doc.loadingTask;
+    if (t && t.destroy) t.destroy();
+  } catch (e) {
+    console.warn('pdf destroy failed', e);
+  }
+}
+
 export class PdfView {
   constructor(container, opts = {}) {
     this.container = container;
@@ -65,6 +75,15 @@ export class PdfView {
       }, 150);
     });
     this.ro.observe(container);
+    // browsers may discard canvases of hidden tabs / after sleep: redraw on return
+    const heal = () => {
+      if (document.visibilityState === 'hidden') return;
+      for (const p of this.pages)
+        if (p.canvas && !p.canvas.isConnected) ((p.canvas = null), (p.key = null));
+      this._ensureVisible();
+    };
+    document.addEventListener('visibilitychange', heal);
+    window.addEventListener('focus', heal);
   }
 
   // ---------- geometry helpers
@@ -121,17 +140,22 @@ export class PdfView {
         key: null,
         task: null,
         links: false,
+        dead: false,
+        retries: 0,
       };
     });
     return { wrapper, pages };
   }
 
   // ---------- rendering
-  async _renderPage(p, _idx, _gen) {
+  async _renderPage(p) {
+    if (p.dead) return;
     const dpr = window.devicePixelRatio || 1;
     const key = p.w + 'x' + p.h + '@' + dpr;
-    if (p.key === key && p.canvas) return;
+    if (p.key === key && p.canvas && p.canvas.isConnected) return;
     if (p.task) {
+      // a render for the same size is already running: let it finish
+      if (p.taskKey === key) return;
       try {
         p.task.cancel();
       } catch {
@@ -144,26 +168,64 @@ export class PdfView {
     const canvas = document.createElement('canvas');
     canvas.width = cw;
     canvas.height = Math.round(p.h * dpr);
+    // a lost GPU context leaves a blank bitmap: drop it so the page gets redrawn
+    canvas.addEventListener('contextlost', () => this._invalidate(p, canvas));
     const task = p.proxy.render({
       canvas,
       canvasContext: canvas.getContext('2d'),
       viewport: vp,
     });
     p.task = task;
+    p.taskKey = key;
+    let failed = false;
     try {
       await task.promise;
     } catch (e) {
-      if (e && e.name === 'RenderingCancelledException') return;
-      console.error('render failed', e);
+      if (!(e && e.name === 'RenderingCancelledException')) {
+        console.error('render failed', e);
+        failed = true;
+      }
+    }
+    if (p.task === task) {
+      p.task = null;
+      p.taskKey = null;
+    } else if (!failed && p.task) {
+      return; // superseded by a newer render, which will finish the job
+    }
+    if (p.dead) return;
+    if (failed) {
+      // never leave a page blank: retry a few times
+      if (p.retries++ < 3) setTimeout(() => this._ensureVisible(), 200 * p.retries);
       return;
     }
-    if (p.task === task) p.task = null;
-    if (!this.pages.includes(p) && !(this._pending && this._pending.includes(p))) return;
+    // the size may have changed while we were rendering
+    const cur = p.w + 'x' + p.h + '@' + (window.devicePixelRatio || 1);
+    if (cur !== key) {
+      this._ensureVisible();
+      return;
+    }
+    p.retries = 0;
     if (p.canvas) p.canvas.remove();
     p.el.appendChild(canvas);
     p.canvas = canvas;
     p.key = key;
     this._addLinks(p);
+  }
+
+  _invalidate(p, canvas) {
+    if (p.canvas !== canvas) return;
+    p.canvas = null;
+    p.key = null;
+    this._ensureVisible();
+  }
+
+  // re-render every visible page that is missing or stale (self-healing)
+  _ensureVisible() {
+    if (this._ensureT) return;
+    this._ensureT = setTimeout(() => {
+      this._ensureT = 0;
+      this._renderVisible();
+    }, 30);
   }
 
   // clickable link annotations (table of contents, \ref, \url ...)
@@ -227,10 +289,10 @@ export class PdfView {
     }
   }
 
-  _renderRange(pages, from, to, gen) {
+  _renderRange(pages, from, to) {
     const jobs = [];
     for (let i = Math.max(0, from); i <= Math.min(pages.length - 1, to); i++)
-      jobs.push(this._renderPage(pages[i], i, gen));
+      jobs.push(this._renderPage(pages[i]));
     return Promise.all(jobs);
   }
 
@@ -258,7 +320,7 @@ export class PdfView {
     if (!this.pages.length) return;
     const top = this.container.scrollTop;
     const [a, b] = this._visibleRange(this.pages, top);
-    this._renderRange(this.pages, a - 1, b, this.gen);
+    this._renderRange(this.pages, a - 1, b);
   }
 
   _setupObserver() {
@@ -268,7 +330,7 @@ export class PdfView {
         for (const e of entries) {
           if (!e.isIntersecting) continue;
           const idx = this.pages.findIndex((p) => p.el === e.target);
-          if (idx >= 0) this._renderPage(this.pages[idx], idx, this.gen);
+          if (idx >= 0) this._renderPage(this.pages[idx]);
         }
       },
       { root: this.container, rootMargin: '100% 0px 100% 0px' },
@@ -290,10 +352,12 @@ export class PdfView {
       if (this.opts.onPageChange) this.opts.onPageChange(this.currentPage, this.numPages);
     }
     if (this.opts.onScroll) this.opts.onScroll();
+    this._ensureVisible();
     // free far-away canvases
     for (let i = 0; i < this.pages.length; i++) {
       const p = this.pages[i];
       if (p.canvas && Math.abs(i - idx) > KEEP_PAGES) {
+        if (p.task) continue;
         p.canvas.width = 0;
         p.canvas.remove();
         p.canvas = null;
@@ -306,6 +370,7 @@ export class PdfView {
   async load(url, { anchor: forcedAnchor } = {}) {
     const gen = ++this.gen;
     let doc;
+    let newPages = null;
     try {
       const r = await fetch(url, { cache: 'no-store' });
       if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -313,53 +378,54 @@ export class PdfView {
       if (gen !== this.gen) return false;
       doc = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
       if (gen !== this.gen) {
-        doc.destroy();
+        destroyDoc(doc);
         return false;
       }
       const proxies = await Promise.all(
         Array.from({ length: doc.numPages }, (_, i) => doc.getPage(i + 1)),
       );
       if (gen !== this.gen) {
-        doc.destroy();
+        destroyDoc(doc);
         return false;
       }
 
       const first = proxies[0].getViewport({ scale: 1 });
       const scale = this._computeScale(first.width, first.height);
       const { wrapper, pages } = this._buildWrapper(proxies, scale);
+      newPages = pages;
       wrapper.style.cssText = 'position:absolute;visibility:hidden;top:0;left:0;width:100%;';
       this.container.appendChild(wrapper);
-      const saveScale = this.scale;
       let anchor = forcedAnchor || this.captureAnchor();
       const target0 = this._targetTop(anchor, pages);
 
       // render pages that will be visible after the swap, off-screen
-      this._pending = pages;
-      this.scale = scale; // _renderPage reads this.scale
+      const abandon = () => {
+        for (const p of pages) {
+          p.dead = true;
+          if (p.task) {
+            try {
+              p.task.cancel();
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+        wrapper.remove();
+        destroyDoc(doc);
+        return false;
+      };
       const [a, b] = this._visibleRange(pages, target0);
-      try {
-        await this._renderRange(pages, a - 1, b, gen);
-      } finally {
-        this.scale = saveScale;
-        this._pending = null;
-      }
-      if (gen !== this.gen) {
-        wrapper.remove();
-        doc.destroy();
-        return false;
-      }
+      await this._renderRange(pages, a - 1, b);
+      if (gen !== this.gen) return abandon();
       await nextFrame();
-      if (gen !== this.gen) {
-        wrapper.remove();
-        doc.destroy();
-        return false;
-      }
+      if (gen !== this.gen) return abandon();
 
       // ---- atomic swap (no awaits)
       if (!forcedAnchor) anchor = this.captureAnchor(); // user may have scrolled meanwhile
       const oldDoc = this.doc;
       const oldWrapper = this.wrapper;
       for (const p of this.pages) {
+        p.dead = true;
         if (p.task) {
           try {
             p.task.cancel();
@@ -379,8 +445,9 @@ export class PdfView {
       c.scrollTop = this._targetTop(anchor, pages);
       c.scrollLeft = anchor.left;
       // ----
-      if (oldDoc) oldDoc.destroy();
+      if (oldDoc) destroyDoc(oldDoc);
       this._setupObserver();
+      this._applyZoom(false); // zoom/size may have changed while loading
       this._renderVisible();
       this._onScroll();
       this.currentPage = Math.min(this.currentPage, this.numPages) || 1;
@@ -391,13 +458,14 @@ export class PdfView {
       console.error('PdfView.load failed (keeping previous view)', e);
       if (doc && doc !== this.doc) {
         try {
-          doc.destroy();
+          destroyDoc(doc);
         } catch {
           /* ignore */
         }
       }
       for (const w of this.container.querySelectorAll('.pdf-pages'))
         if (w !== this.wrapper) w.remove();
+      if (newPages && newPages !== this.pages) for (const p of newPages) p.dead = true;
       return false;
     }
   }
