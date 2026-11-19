@@ -4,7 +4,11 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 const GUTTER = 10; // px gap around pages
 const CSS_UNITS = 96 / 72;
-const KEEP_PAGES = 10; // free canvases further than this from the current page
+const KEEP_PAGES = 4; // free canvases further than this from the current page
+const KEEP_NEAR = 1; // ...but never free pages this close, whatever the budget
+const PIXEL_BUDGET = 40e6; // total canvas pixels kept alive (~160 MB RGBA)
+const MAX_CANVAS_PIXELS = 12e6; // one page bitmap never exceeds this (CSS stretches the rest)
+const ZOOM_RENDER_DELAY = 90; // ms: render once a zoom burst settles
 
 const nextFrame = () =>
   new Promise((res) => {
@@ -18,6 +22,15 @@ const nextFrame = () =>
     requestAnimationFrame(fin);
     setTimeout(fin, 120); // rAF may be paused in background tabs
   });
+
+async function contentHash(buf) {
+  try {
+    const d = await crypto.subtle.digest('SHA-1', buf);
+    return Array.from(new Uint8Array(d), (b) => b.toString(16).padStart(2, '0')).join('');
+  } catch {
+    return null; // insecure context: just always reload
+  }
+}
 
 // pdf.js 6: PDFDocumentProxy has no destroy(); the loading task owns the worker resources
 function destroyDoc(doc) {
@@ -163,11 +176,14 @@ export class PdfView {
       }
       p.task = null;
     }
-    const cw = Math.round(p.w * dpr);
+    let pxScale = dpr;
+    const full = p.w * dpr * (p.h * dpr);
+    if (full > MAX_CANVAS_PIXELS) pxScale = dpr * Math.sqrt(MAX_CANVAS_PIXELS / full);
+    const cw = Math.max(1, Math.round(p.w * pxScale));
     const vp = p.proxy.getViewport({ scale: cw / p.ptW });
     const canvas = document.createElement('canvas');
     canvas.width = cw;
-    canvas.height = Math.round(p.h * dpr);
+    canvas.height = Math.max(1, Math.round(p.h * pxScale));
     // a lost GPU context leaves a blank bitmap: drop it so the page gets redrawn
     canvas.addEventListener('contextlost', () => this._invalidate(p, canvas));
     const task = p.proxy.render({
@@ -221,7 +237,7 @@ export class PdfView {
 
   // re-render every visible page that is missing or stale (self-healing)
   _ensureVisible() {
-    if (this._ensureT) return;
+    if (this._ensureT || this._zooming) return;
     this._ensureT = setTimeout(() => {
       this._ensureT = 0;
       this._renderVisible();
@@ -353,21 +369,34 @@ export class PdfView {
     }
     if (this.opts.onScroll) this.opts.onScroll();
     this._ensureVisible();
-    // free far-away canvases
+    this._evict(idx);
+  }
+
+  // free canvases far from the current page, and the farthest ones once over budget
+  _evict(idx) {
+    const live = [];
+    let total = 0;
     for (let i = 0; i < this.pages.length; i++) {
       const p = this.pages[i];
-      if (p.canvas && Math.abs(i - idx) > KEEP_PAGES) {
-        if (p.task) continue;
-        p.canvas.width = 0;
-        p.canvas.remove();
-        p.canvas = null;
-        p.key = null;
-      }
+      if (!p.canvas) continue;
+      total += p.canvas.width * p.canvas.height;
+      live.push([Math.abs(i - idx), p]);
+    }
+    live.sort((x, y) => y[0] - x[0]); // farthest first
+    for (const [d, p] of live) {
+      if (d <= KEEP_NEAR) break;
+      if (d <= KEEP_PAGES && total <= PIXEL_BUDGET) break;
+      if (p.task) continue;
+      total -= p.canvas.width * p.canvas.height;
+      p.canvas.width = 0;
+      p.canvas.remove();
+      p.canvas = null;
+      p.key = null;
     }
   }
 
   // ---------- public API
-  async load(url, { anchor: forcedAnchor } = {}) {
+  async load(url, { anchor: forcedAnchor, force = false } = {}) {
     const gen = ++this.gen;
     let doc;
     let newPages = null;
@@ -376,6 +405,10 @@ export class PdfView {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const buf = await r.arrayBuffer();
       if (gen !== this.gen) return false;
+      // identical bytes (e.g. a recompile that changed nothing): keep the current view untouched
+      const hash = await contentHash(buf);
+      if (gen !== this.gen) return false;
+      if (hash && hash === this._hash && this.doc && !force) return true;
       doc = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
       if (gen !== this.gen) {
         destroyDoc(doc);
@@ -439,6 +472,7 @@ export class PdfView {
       this.wrapper = wrapper;
       this.pages = pages;
       this.doc = doc;
+      this._hash = hash;
       this.scale = scale;
       this.numPages = doc.numPages;
       const c = this.container;
@@ -492,7 +526,13 @@ export class PdfView {
     }
     this.container.scrollTop = this._targetTop(anchor, this.pages);
     this.container.scrollLeft = anchor.left;
-    this._renderVisible();
+    // old bitmaps stay CSS-stretched meanwhile; draw once the zoom burst settles
+    clearTimeout(this._zoomT);
+    this._zooming = true;
+    this._zoomT = setTimeout(() => {
+      this._zooming = false;
+      this._renderVisible();
+    }, ZOOM_RENDER_DELAY);
     if (this.opts.onZoom) this.opts.onZoom(this.zoom, this.scale / CSS_UNITS);
   }
 
